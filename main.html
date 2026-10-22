@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASO Dashboard - Final</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f4f5f7;
+            --card-bg: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #8c8c8c;
+            --border-color: #eaeaea;
+            --radius-lg: 12px;
+            --radius-md: 8px;
+            
+            --success: #34c759;
+            --success-hover: #28a745;
+            --danger: #ff3b30;
+            --warning: #ffcc00;
+            
+            --chart-gp: #8ab4f8;
+            --chart-rs: #f28b82;
+            --chart-as: #b0b4b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 24px; font-size: 14px; }
+
+        /* --- ОБЩИЕ КОМПОНЕНТЫ --- */
+        .card { background: var(--card-bg); border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .card.full-width { grid-column: 1 / -1; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .card-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+
+        .btn { background: var(--card-bg); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; color: var(--text-main); }
+        .btn:hover { background: #f0f0f0; }
+        .btn--primary { background: var(--text-main); color: white; border: none; }
+        .btn--primary:hover { background: #333; }
+        
+        /* Кнопка с иконкой (карандаш) */
+        .btn--ghost { border: 1px solid var(--border-color); background: white; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; }
+        .btn--ghost:hover { border-color: #ccc; background: #f9f9f9; color: #007aff; }
+        .btn--ghost svg { width: 16px; height: 16px; }
+
+        /* --- ТУЛТИПЫ --- */
+        .tooltip-container { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #e0e0e0; color: #666; font-size: 10px; font-weight: 700; cursor: help; }
+        .tooltip-container:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 400; white-space: normal; width: 200px; text-align: center; z-index: 10; margin-bottom: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); line-height: 1.4; }
+
+        /* --- ШАПКА --- */
+        .app-header { background: var(--card-bg); border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; align-items: center; justify-content: space-between; }
+        .app-info { display: flex; align-items: center; gap: 16px; }
+        .app-icon { width: 64px; height: 64px; border-radius: 16px; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+        .app-details h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .app-details .meta { font-size: 13px; color: var(--text-muted); display: flex; gap: 12px; }
+        
+        /* ИСПРАВЛЕННОЕ ВЫРАВНИВАНИЕ СТАТИСТИКИ */
+        .app-stats { display: flex; gap: 32px; align-items: flex-end; }
+        .stat-item { display: flex; flex-direction: column; align-items: flex-end; }
+        .stat-item .value { font-size: 24px; font-weight: 700; line-height: 1.2; }
+        .stat-item .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; margin-top: 4px; }
+
+        /* --- ФИЛЬТРЫ --- */
+        .filters-panel { background: var(--card-bg); border-radius: var(--radius-lg); padding: 12px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; gap: 24px; align-items: center; }
+        .filter-label { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .date-picker { border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 8px 12px; font-size: 14px; outline: none; margin-left: auto; }
+        .checkbox-group { display: flex; gap: 16px; }
+        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+        .checkbox-label input { accent-color: var(--danger); width: 16px; height: 16px; }
+
+        /* --- СЕТКА --- */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+        /* --- ИНСАЙТЫ --- */
+        .ai-insights-container { display: flex; flex-direction: column; gap: 12px; }
+        .insight-card { border-radius: var(--radius-md); padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid transparent; }
+        .insight-card.danger { background: #fff0f0; border-color: rgba(255, 59, 48, 0.2); }
+        .insight-card.warning { background: #fff9e6; border-color: rgba(255, 204, 0, 0.2); }
+        .insight-icon { font-size: 20px; line-height: 1; }
+        .insight-content { flex-grow: 1; }
+        .insight-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+        .insight-desc { font-size: 13px; color: var(--text-main); opacity: 0.8; line-height: 1.4; }
+
+        /* --- ГРАФИК --- */
+        .chart-container { position: relative; height: 250px; width: 100%; }
+
+        /* --- ТАБЛИЦА --- */
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; font-size: 13px; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border-color); }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        
+        .td-pos { display: flex; align-items: center; gap: 6px; }
+        .pos-badge { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 13px; background: rgba(255, 59, 48, 0.1); color: var(--danger); }
+        .rank-delta { font-size: 12px; font-weight: 600; }
+        .delta-down { color: var(--danger); }
+        .delta-up { color: var(--success); }
+        
+        .leader-list { display: flex; flex-direction: column; gap: 4px; }
+        .leader-item { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+        .leader-name { font-weight: 500; width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .leader-pos { color: var(--success); font-weight: 600; }
+
+        .td-freq { display: flex; align-items: center; gap: 10px; }
+        .bar-track { width: 50px; height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 3px; }
+        .bar-high { background: var(--success); }
+        .bar-med { background: var(--warning); }
+        .freq-num { font-size: 14px; font-weight: 600; color: var(--text-main); }
+
+        /* --- МОДАЛЬНЫЕ ОКНА --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s ease; }
+        .modal-content { background: var(--card-bg); width: 90%; max-width: 600px; max-height: 90vh; border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .modal-body { padding: 24px; overflow-y: auto; }
+        .close-btn { background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+        
+        .action-step { display: flex; gap: 16px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed var(--border-color); }
+        .action-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .step-num { background: var(--text-main); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+        .step-text h4 { font-size: 15px; margin-bottom: 4px; }
+        .step-text p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+        
+        .forecast-box { background: var(--bg-color); padding: 16px; border-radius: var(--radius-md); margin-top: 16px; display: flex; align-items: center; gap: 12px; }
+
+        .metadata-compare { display: flex; gap: 16px; margin-top: 16px; }
+        .meta-col { flex: 1; background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .meta-col h5 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .meta-col p { font-size: 13px; line-height: 1.4; margin-bottom: 8px; }
+        .meta-col p:last-child { margin-bottom: 0; }
+        .highlight-key { background: rgba(255, 204, 0, 0.3); padding: 0 2px; border-radius: 2px; }
+
+        /* --- ФУТЕР МОДАЛКИ --- */
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            background: #fafafa;
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        }
+
+        .modal-footer .btn { border: 1px solid var(--border-color); background: var(--card-bg); }
+        .modal-footer .btn--success-light { background: rgba(52, 199, 89, 0.1); color: var(--success-hover); border: 1px solid rgba(52, 199, 89, 0.3); }
+        .modal-footer .btn--success-light:hover { background: rgba(52, 199, 89, 0.2); }
+        .modal-footer .btn--gray { background: #f0f0f0; color: var(--text-main); border-color: transparent; }
+        .modal-footer .btn--gray:hover { background: #e5e5e5; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <!-- ШАПКА ПРИЛОЖЕНИЯ -->
+    <div class="app-header">
+        <div class="app-info">
+            <div class="app-icon">🧸</div>
+            <div class="app-details">
+                <h1>Детский мир</h1>
+                <div class="meta">
+                    <span>Разработчик: ПАО «Детский мир»</span>
+                    <span>•</span>
+                    <span>Категория: Покупки</span>
+                </div>
+            </div>
+        </div>
+        <div class="app-stats">
+            <div class="stat-item">
+                <div class="value">75.7%</div>
+                <div class="label">Индекс видимости</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">4.8 ★</div>
+                <div class="label">Рейтинг</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">150K</div>
+                <div class="label">Оценок</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ФИЛЬТРЫ -->
+    <div class="filters-panel">
+        <div class="filter-label">Магазины:</div>
+        <div class="checkbox-group">
+            <label class="checkbox-label"><input type="checkbox" class="store-filter" value="all" checked> Все</label>
+            <label class="checkbox-label"><input type="checkbox" class="store-filter" value="gp" checked> Google Play</label>
+            <label class="checkbox-label"><input type="checkbox" class="store-filter" value="rs" checked> RuStore</label>
+            <label class="checkbox-label"><input type="checkbox" class="store-filter" value="as" checked> App Store</label>
+        </div>
+        
+        <button class="btn--ghost" title="Настроить магазины">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        </button>
+
+        <input type="text" class="date-picker" value="01.10.2026 - 22.10.2026" readonly>
+        <button class="btn btn--primary" onclick="updateChartFromFilters()">Обновить</button>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <div class="card full-width">
+            <div class="card-header">
+                <div class="card-title">
+                    Рекомендации и инсайты
+                    <div class="tooltip-container" data-tooltip="Автоматический анализ проблем и подсказки, основанные на данных из магазинов.">?</div>
+                </div>
+            </div>
+            <div class="ai-insights-container">
+                <div class="insight-card danger">
+                    <div class="insight-icon">🚨</div>
+                    <div class="insight-content">
+                        <div class="insight-title">Критическое падение в RuStore</div>
+                        <div class="insight-desc">Видимость упала на 15% за неделю. По ключу «детская одежда» вы на 22 месте, тогда как Lamoda поднялась на 2-е.</div>
+                    </div>
+                    <button class="btn" onclick="openActionModal('rustore')">Действия</button>
+                </div>
+                <div class="insight-card warning">
+                    <div class="insight-icon">💡</div>
+                    <div class="insight-content">
+                        <div class="insight-title">Упущенная возможность в Google Play</div>
+                        <div class="insight-desc">Конкуренты (Osti, Sela) используют слово «школьная» в заголовке. Вы находитесь на 15 месте, хотя по частотности ключ в Топ-3 категории.</div>
+                    </div>
+                    <button class="btn" onclick="openActionModal('googleplay')">Действия</button>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 16px;">
+                <button class="btn" style="width: 100%;">Еще</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    Индекс видимости
+                    <div class="tooltip-container" data-tooltip="Показывает, насколько хорошо приложение ранжируется по отслеживаемым ключам в разных магазинах.">?</div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="visibilityChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    Упущенный трафик
+                    <div class="tooltip-container" data-tooltip="Ключи, по которым вы находитесь вне Топ-10, а ваши конкуренты занимают первые места.">?</div>
+                </div>
+                <button class="btn">Показать все</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ключ</th>
+                        <th>Позиция</th>
+                        <th>Лидеры (Топ-3)</th>
+                        <th>Частотность</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>детская одежда</td>
+                        <td>
+                            <div class="td-pos">
+                                <span class="pos-badge">22</span>
+                                <span class="rank-delta delta-down">▼ 3</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="leader-list">
+                                <div class="leader-item"><span class="leader-name">Lamoda</span> <span class="leader-pos">1</span></div>
+                                <div class="leader-item"><span class="leader-name">Osti</span> <span class="leader-pos">2</span></div>
+                                <div class="leader-item"><span class="leader-name">Funday</span> <span class="leader-pos">3</span></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="td-freq">
+                                <div class="bar-track"><div class="bar-fill bar-high" style="width: 85%;"></div></div>
+                                <span class="freq-num">8 500</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>игрушки для мальчиков</td>
+                        <td>
+                            <div class="td-pos">
+                                <span class="pos-badge">15</span>
+                                <span class="rank-delta delta-up">▲ 1</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="leader-list">
+                                <div class="leader-item"><span class="leader-name">Ozon</span> <span class="leader-pos">1</span></div>
+                                <div class="leader-item"><span class="leader-name">Wildberries</span> <span class="leader-pos">2</span></div>
+                                <div class="leader-item"><span class="leader-name">Bebakids</span> <span class="leader-pos">3</span></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="td-freq">
+                                <div class="bar-track"><div class="bar-fill bar-med" style="width: 42%;"></div></div>
+                                <span class="freq-num">4 200</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО -->
+    <div class="modal-overlay" id="actionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">✨ План действий</div>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="actionModalBody">
+                <!-- Контент подставляется через JS -->
+            </div>
+            <!-- ФИНАЛЬНЫЙ ФУТЕР -->
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">Отложить</button>
+                <button class="btn btn--gray" onclick="startABTest()">A/B тест</button>
+                <button class="btn btn--success-light" onclick="applyAction()">Применить рекомендацию</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ГРАФИК ---
+        const ctx = document.getElementById('visibilityChart').getContext('2d');
+        const storeData = { gp: 71.88, rs: 45.2, as: 79.12 };
+
+        let myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Google Play', 'RuStore', 'App Store'],
+                datasets: [{
+                    label: 'Видимость (%)',
+                    data: [storeData.gp, storeData.rs, storeData.as],
+                    backgroundColor: ['#8ab4f8', '#f28b82', '#b0b4b8'],
+                    borderRadius: 6,
+                    barPercentage: 0.5
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0', drawBorder: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        function updateChartFromFilters() {
+            const checked = Array.from(document.querySelectorAll('.store-filter:checked')).map(cb => cb.value);
+            const labels = []; const data = []; const bgColors = [];
+
+            if (checked.includes('all') || checked.length === 3) {
+                labels.push('Google Play', 'RuStore', 'App Store');
+                data.push(storeData.gp, storeData.rs, storeData.as);
+                bgColors.push('#8ab4f8', '#f28b82', '#b0b4b8');
+            } else {
+                if (checked.includes('gp')) { labels.push('Google Play'); data.push(storeData.gp); bgColors.push('#8ab4f8'); }
+                if (checked.includes('rs')) { labels.push('RuStore'); data.push(storeData.rs); bgColors.push('#f28b82'); }
+                if (checked.includes('as')) { labels.push('App Store'); data.push(storeData.as); bgColors.push('#b0b4b8'); }
+            }
+
+            myChart.data.labels = labels;
+            myChart.data.datasets[0].data = data;
+            myChart.data.datasets[0].backgroundColor = bgColors;
+            myChart.update();
+        }
+
+        document.querySelector('.store-filter[value="all"]').addEventListener('change', function(e) {
+            const others = document.querySelectorAll('.store-filter:not([value="all"])');
+            others.forEach(cb => cb.checked = e.target.checked);
+        });
+
+        // --- МОДАЛЬНОЕ ОКНО ---
+        const actionsData = {
+            rustore: `
+                <div class="action-step">
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <h4>Обновите название и подзаголовок в RuStore</h4>
+                        <p>Конкуренты используют прямые вхождения «детская одежда» в заголовке. У вас этот ключ только в описании.</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 16px; margin-bottom: 16px;">
+                    <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Сравнение метаданных:</div>
+                    <div class="metadata-compare">
+                        <div class="meta-col">
+                            <h5>Ваше приложение</h5>
+                            <p><strong>Название:</strong> Детский мир</p>
+                            <p><strong>Краткое описание:</strong> Детские товары с доставкой</p>
+                        </div>
+                        <div class="meta-col" style="background: #fff8e6; border-color: #ffd666;">
+                            <h5>Lamoda</h5>
+                            <p><strong>Название:</strong> Lamoda - <span class="highlight-key">детская одежда</span></p>
+                            <p><strong>Краткое описание:</strong> <span class="highlight-key">Одежда</span> для детей и взрослых</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="forecast-box">
+                    <span style="font-size: 24px;">📈</span>
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">Прогноз ИИ</div>
+                        <div style="font-size: 13px; color: var(--text-muted);">Ожидаемый рост: <strong>+8 позиций</strong>.</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">* На основе исторических данных по 15 похожим ключам</div>
+                    </div>
+                </div>
+            `,
+            googleplay: `
+                <div class="action-step">
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <h4>Добавьте «школьная» в краткое описание</h4>
+                        <p>В Google Play индексируется краткое описание (до 80 символов). Сейчас у вас там текст без ключа.</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 16px; margin-bottom: 16px;">
+                    <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Сравнение метаданных:</div>
+                    <div class="metadata-compare">
+                        <div class="meta-col">
+                            <h5>Ваше приложение</h5>
+                            <p><strong>Краткое описание:</strong> Детские товары с доставкой</p>
+                        </div>
+                        <div class="meta-col" style="background: #fff8e6; border-color: #ffd666;">
+                            <h5>Osti</h5>
+                            <p><strong>Краткое описание:</strong> <span class="highlight-key">Школьная</span> форма и одежда</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="forecast-box">
+                    <span style="font-size: 24px;">📈</span>
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">Прогноз ИИ</div>
+                        <div style="font-size: 13px; color: var(--text-muted);">Ожидаемый рост: <strong>+12 позиций</strong>.</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">* На основе исторических данных по 15 похожим ключам</div>
+                    </div>
+                </div>
+            `
+        };
+
+        function openActionModal(type) {
+            document.getElementById('actionModalBody').innerHTML = actionsData[type];
+            document.getElementById('actionModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('actionModal').classList.remove('active');
+        }
+
+        function applyAction() {
+            alert('Действие применено! (В реальности здесь произойдет обновление метаданных)');
+            closeModal();
+        }
+
+        function startABTest() {
+            alert('Запуск A/B теста! (В реальности здесь откроется форма настройки эксперимента)');
+            closeModal();
+        }
+
+        document.getElementById('actionModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+</body>
+</html>
